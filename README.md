@@ -141,12 +141,19 @@ dsh plugin --profile <profile> add dsh-lan-gateway
 
 `<profile>` 换成你的 profile 名，例如 `desktop` 或 `web`。
 
-### 方式二：本地源码
+### 方式二：从 Git 仓库一键安装（推荐）
+
+插件不依赖宿主额外安装 Schemastery；依赖和配置 schema 均随仓库提供。使用 DSH 插件管理器安装 Git 地址：
+
+```bash
+dsh plugin --profile <profile> add github:KylinCloud-sys/dsh-lan-gateway
+```
+
+也可以先 clone 后以本地 link 安装：
 
 ```bash
 git clone https://github.com/KylinCloud-sys/dsh-lan-gateway.git
-cd dsh-lan-gateway
-dsh plugin --profile <profile> add link:$(pwd)
+dsh plugin --profile <profile> add link:./dsh-lan-gateway
 ```
 
 ### 方式三：手动登记（profile 被应用独占管理时）
