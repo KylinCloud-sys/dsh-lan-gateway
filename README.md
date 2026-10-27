@@ -78,6 +78,25 @@ DSH 对每个请求做来源校验：`Origin` 必须与 `Host` 是同一个地�
 
 `X-Forwarded-For / Host / Proto` 一律剥除，避免来源被伪造。
 
+### 响应压缩
+
+DSH 的客户端 bundle 路由**不压缩**：首页一次要拉约 11.8 MB 原始 JS。
+经带宽受限的内网穿透隧道传输时，这么大量很容易传到一半就断开，
+表现是手机"加载一阵子后隧道掉线"。
+
+插件在转发时对文本类响应补一层 gzip，实测把首页资源压到约 4.3 MB（省 63%）：
+
+| 资源组 | 原始 | gzip 后 |
+| --- | --- | --- |
+| 客户端主包 | 8,962 KB | 3,850 KB |
+| 客户端副包 | 3,118 KB | 575 KB |
+| 模块入口 | 45 KB | 12 KB |
+| **合计** | **11.84 MB** | **4.33 MB** |
+
+只压缩 `text/*`、`application/javascript|json|xml|wasm`、`image/svg+xml`；
+已带 `Content-Encoding` 的响应、SSE 流、以及未声明 `Accept-Encoding: gzip`
+的客户端一律原样透传。
+
 ### 认证
 
 DSH 的浏览器会话 cookie 绑定访问地址（cookie 名由 `Host` 计算，校验时还要
