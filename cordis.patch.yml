@@ -1,0 +1,6 @@
+# dsh-lan-gateway — DSH bundle patch
+# 把本插件插入 profile 配置树。DSH 本体仍监听 127.0.0.1:3080，
+# 插件另起 0.0.0.0:3081 做反向代理，供其他设备访问。
+- insert:
+    - id: lan-gateway
+      name: dsh-lan-gateway

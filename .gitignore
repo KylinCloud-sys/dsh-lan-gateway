@@ -1,0 +1,32 @@
+# 依赖
+/node_modules/
+/.pnpm-store/
+
+# 日志
+*.log
+logs/
+
+# 运行时产物
+/tmp/
+/coverage/
+*.tmp
+*.bak
+
+# 编辑器 / IDE
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 环境与密钥（万一以后有人放本地配置，绝不提交）
+.env
+.env.*
+!.env.example
+*.key
+*.pem
