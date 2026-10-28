@@ -43,7 +43,7 @@
   "bugs": {
     "url": "https://github.com/KylinCloud-sys/dsh-lan-gateway/issues"
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "*"
+  "engines": {
+    "node": ">=20"
   }
 }
