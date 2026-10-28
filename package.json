@@ -12,7 +12,7 @@
   "type": "module",
   "main": "lib/index.js",
   "scripts": {
-    "test": "node test/schema.test.mjs"
+    "test": "node test/schema.test.mjs && node test/proxy.test.mjs"
   },
   "exports": {
     ".": "./lib/index.js",

@@ -84,10 +84,10 @@ check('settings page is exposed (volatileForm is defined)', () => {
   assert('listeners' in form.dict, 'listeners missing from the projected form')
 })
 
-check('upstream endpoint is never editable', () => {
+check('only the listener list is editable', () => {
   const form = volatileForm(Config)
-  assert(!('upstreamHost' in form.dict), 'upstreamHost must stay fixed')
-  assert(!('upstreamPort' in form.dict), 'upstreamPort must stay fixed')
+  assert(!('upstreamHost' in form.dict), 'upstreamHost must not be a config field')
+  assert(!('upstreamPort' in form.dict), 'upstreamPort must not be a config field')
   assert(!('listenHosts' in form.dict), 'legacy listenHosts must not be editable')
 })
 
@@ -137,8 +137,23 @@ check('serialized schema is the {uid, refs} graph the Host rehydrates', () => {
   assert(typeof json.refs[root.dict.listeners].inner === 'number', 'array nodes must reference their item schema')
 })
 
-check('the upstream port cannot be used as a listener port', () => {
-  assert(/3080/u.test(reject({ listeners: [{ host: '0.0.0.0', port: 3080 }] }, 'port 3080 must be rejected')), 'message should name 3080')
+check('the endpoint is no longer a config field', () => {
+  const plain = plainConfig(activate({}))
+  assert(!('upstreamHost' in plain), 'upstreamHost must not exist in config')
+  assert(!('upstreamPort' in plain), 'upstreamPort must not exist in config')
+})
+
+check('the upstream port is no longer a dead listener port', () => {
+  // 终点每次请求从宿主 webServer 读取，所以 3080 只是一个普通端口；
+  // 真的撞上本体时由运行期的 upstreamConflict() 跳过并提示。
+  const result = Config['~standard'].validate({ listeners: [{ host: '0.0.0.0', port: 3080 }] })
+  assert(result.issues === undefined, `port 3080 should validate: ${JSON.stringify(result.issues)}`)
+})
+
+check('legacy upstream config is ignored, not fatal', () => {
+  const value = activate({ upstreamHost: '0.0.0.0', upstreamPort: 3088, listeners: [{ host: '0.0.0.0', port: 3081 }] })
+  assert(!('upstreamPort' in plainConfig(value)), 'legacy upstreamPort must be dropped')
+  assert(same(resolveConfig(value).listeners, [{ host: '0.0.0.0', port: 3081 }]), 'listeners must survive')
 })
 
 check('wildcard and duplicate conflicts are rejected', () => {
@@ -153,11 +168,6 @@ check('hosts must be bare addresses, ports must be in range', () => {
   reject({ listeners: [{ host: '', port: 3081 }] }, 'empty host must be rejected')
 })
 
-check('the upstream endpoint is fixed', () => {
-  reject({ upstreamPort: 3088 }, 'upstreamPort must be rejected')
-  reject({ upstreamHost: '0.0.0.0' }, 'upstreamHost must be rejected')
-})
-
 check('legacy listenHosts/listenPort still migrate', () => {
   const migrated = activate({ listenHosts: ['192.0.2.10', '127.0.0.1'], listenPort: 3099 })
   assert(same(migrated.listeners.get(), [{ host: '192.0.2.10', port: 3099 }, { host: '127.0.0.1', port: 3099 }]), `migration = ${JSON.stringify(migrated.listeners.get())}`)
@@ -166,7 +176,6 @@ check('legacy listenHosts/listenPort still migrate', () => {
 check('defaults apply when the entry has no config', () => {
   const plain = plainConfig(activate({}))
   assert(same(plain.listeners, [{ host: '0.0.0.0', port: 3081 }]), `defaults = ${JSON.stringify(plain.listeners)}`)
-  assert(plain.upstreamHost === '127.0.0.1' && plain.upstreamPort === 3080, 'upstream defaults must stay fixed')
 })
 
 for (const [ok, name] of results) console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}`)
