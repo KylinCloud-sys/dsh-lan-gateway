@@ -198,40 +198,64 @@ Get-NetTCPConnection -LocalPort 3081 -State Listen
 
 看到 `0.0.0.0  3081`（默认）或你配置的每个具体地址各一行，即表示插件已加载。
 
+设置页里出现「局域网网关」，且能增删改监听行，即表示配置界面正常工作。
+两者都不需要额外安装依赖——仓库自带一个零依赖自检脚本：
+
+```powershell
+node test/schema.test.mjs
+```
+
 ## 配置
 
-所有配置项均为可选，未填写时使用默认值。在 profile 的 `cordis.patch.yml` 中覆盖：
+### 在设置页里改（推荐）
+
+DSH 的「设置 → 局域网网关」可以直接增删改监听地址与端口，保存后立即生效（不必重启）：
+
+- 一行 = 一个入口，`0.0.0.0` 表示所有网卡
+- 保存时校验：地址非空且不带协议/路径、端口为 1–65535 整数、同端口不能重复或与 `0.0.0.0` 冲突
+- **`3080` 不能作为监听端口**（它是 DSH 本体端口），填了会被拒绝
+- 列表清空并保存 = 关掉网关，DSH 本体照常运行
+
+### 在 profile 里改（等价写法）
+
+写入 profile 的 `cordis.patch.yml`：
 
 ```yaml
 - id: lan-gateway
   config:
-    listenHosts:            # 监听地址，可写多个（缩小暴露面的关键）
-      - 10.x.x.x
-      - 192.168.0.x
-    listenPort: 3081        # 对外端口
-    upstreamHost: 127.0.0.1
-    upstreamPort: 3080      # DSH 本体端口
+    listeners:
+      - host: 0.0.0.0        # 或具体网卡地址（更安全，见下）
+        port: 3081
+      - host: 192.168.0.x
+        port: 3082
 ```
 
 | 配置项 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `listenHosts` | string[] | `['0.0.0.0']` | 监听地址列表。**建议写成具体网卡地址**，只让指定网段可达；`0.0.0.0` 表示所有网卡 |
-| `listenPort` | number | `3081` | 对外端口。改这里后其他设备也要用新端口访问 |
-| `upstreamHost` | string | `127.0.0.1` | DSH 本体地址。**必须与 DSH 的绑定地址一致**（见下方对应关系） |
-| `upstreamPort` | number | `3080` | DSH 本体端口。与 DSH `webserver` 的 `port` 必须一致 |
+| `listeners` | `{host, port}[]` | `[{host: 0.0.0.0, port: 3081}]` | 监听入口列表，可在设置页里实时增删改；空数组即关闭网关 |
+| `listeners[].host` | string | — | IP 或主机名，**不带 `http://`、路径和端口**；`0.0.0.0` 表示所有网卡 |
+| `listeners[].port` | number | — | 1–65535，且不能是 `3080` |
 
-兼容旧写法：`listenHost: 10.x.x.x`（单个字符串）仍然有效，会被当作只含一个地址的列表。
+**终点地址是固定的**：插件永远把请求转发到 `127.0.0.1:3080`，不能通过配置改。
+如果想换出口端口，请改这里的 `listeners`，不要试图改终点——
+`upstreamHost` / `upstreamPort` 一旦写成其他值会直接校验失败。
+
+兼容旧写法：`listenHosts: [...]` + `listenPort: 3081` 仍然有效，启动时会自动映射成
+等价的 `listeners`；`listenHost: 10.x.x.x`（单个字符串）也仍然有效。
 
 ### 监听多个网段（推荐）
 
-同一端口绑定不同 IP 互不冲突，因此可以精确指定入口，而不是对所有网卡开放：
+同一端口绑定不同 IP 互不冲突，因此可以精确指定入口，而不是对所有网卡开放
+（设置页里一行行填，或写成 YAML）：
 
 ```yaml
 - id: lan-gateway
   config:
-    listenHosts:
-      - 10.x.x.x        # 虚拟局域网：手机/Pad
-      - 192.168.0.x     # 家庭局域网：笔记本
+    listeners:
+      - host: 10.x.x.x        # 虚拟局域网：手机/Pad
+        port: 3081
+      - host: 192.168.0.x     # 家庭局域网：笔记本
+        port: 3081
 ```
 
 这样只有这两个地址可达，家里连了访客 Wi-Fi、或者你在咖啡厅连了公共网络时，
@@ -251,35 +275,27 @@ Get-NetIPAddress -AddressFamily IPv4 | Select-Object InterfaceAlias,IPAddress
 
 ### 与 DSH 本体配置的对应关系
 
-`upstreamHost` / `upstreamPort` 必须和 DSH 自己的 `webserver` 配置**完全一致**，
-否则插件会转发到错误的目标（表现为 502）：
+插件把请求转发到固定的 `127.0.0.1:3080`，它要求 DSH 本体就监听在这个地址上：
 
 ```yaml
 # profile 的 cordis.patch.yml
 - id: webserver
   config:
-    host: 127.0.0.1     # ← 对应 upstreamHost
-    port: 3080          # ← 对应 upstreamPort
+    host: 127.0.0.1
+    port: 3080
 ```
 
-若 DSH 换了端口，两处都要改：
-
-```yaml
-- id: webserver
-  config:
-    port: 3090
-- id: lan-gateway
-  config:
-    upstreamPort: 3090
-```
+如果 DSH 本体换了端口，插件就会 502；此时不要把 `upstreamPort` 写成新端口
+（它被固定为 `3080`，写了会校验失败），而是把 DSH 本体的 `webserver.port`
+改回 `3080`，或者 fork 本仓库修改常量后自行安装。
 
 ### 安全建议：越窄越好
 
 | 做法 | 暴露面 | 维护成本 |
 | --- | --- | --- |
-| `listenHosts: [10.x.x.x, 192.168.0.x]` | 仅指定网段 | IP 变了要改配置 |
-| `listenHosts: [10.x.x.x]` | 仅虚拟局域网 | IP 变了要改配置 |
-| `listenHosts: ['0.0.0.0']`（默认） | 所有网卡，任何接入的网络 | 零维护 |
+| `listeners: [{host: 10.x.x.x}, {host: 192.168.0.x}]` | 仅指定网段 | IP 变了要改配置 |
+| `listeners: [{host: 10.x.x.x}]` | 仅虚拟局域网 | IP 变了要改配置 |
+| `listeners: [{host: 0.0.0.0}]`（默认） | 所有网卡，任何接入的网络 | 零维护 |
 
 **能写白名单就不要用 `0.0.0.0`** —— 默认值只是为了开箱可用，
 不等于推荐配置。本插件没有认证，端口通即等于 DSH 完全可控（见文首免责声明）。
