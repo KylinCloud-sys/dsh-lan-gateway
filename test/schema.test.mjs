@@ -84,11 +84,21 @@ check('settings page is exposed (volatileForm is defined)', () => {
   assert('listeners' in form.dict, 'listeners missing from the projected form')
 })
 
-check('only the listener list is editable', () => {
+check('settings projection exposes the listener list and action nonce only', () => {
   const form = volatileForm(Config)
+  assert('listeners' in form.dict, 'listeners missing from the projected form')
+  assert('rebindNonce' in form.dict, 'rebindNonce missing from the projected form')
   assert(!('upstreamHost' in form.dict), 'upstreamHost must not be a config field')
   assert(!('upstreamPort' in form.dict), 'upstreamPort must not be a config field')
   assert(!('listenHosts' in form.dict), 'legacy listenHosts must not be editable')
+})
+
+check('rebind nonce accepts volatile wrappers and round-trips as a number', () => {
+  const value = activate({ rebindNonce: 7 })
+  assert(isVolatile(value.rebindNonce), 'rebindNonce must implement the volatile protocol')
+  assert(plainConfig(value).rebindNonce === 7, `nonce = ${plainConfig(value).rebindNonce}`)
+  const wrapped = activate({ rebindNonce: value.rebindNonce })
+  assert(plainConfig(wrapped).rebindNonce === 7, 'wrapped nonce must validate')
 })
 
 check('listeners value is a live reference, not a plain array', () => {
@@ -120,8 +130,9 @@ check('runtime config sees the committed value', () => {
   assert(same(resolveConfig(live).listeners, [{ host: '192.0.2.10', port: 3090 }]), 'reconcile would use a stale list')
 })
 
-check('listeners is a declared volatile path for mutate()', () => {
+check('listeners and rebind action are declared volatile paths for mutate()', () => {
   assert(isVolatilePath(Config, ['listeners']) === true, 'listeners must be editable live')
+  assert(isVolatilePath(Config, ['rebindNonce']) === true, 'rebindNonce must be writable as a live action')
   assert(isVolatilePath(Config, ['listenPort']) === false, 'legacy fields must not be editable')
   assert(isVolatilePath(Config, ['upstreamPort']) === false, 'upstream must not be editable')
 })
