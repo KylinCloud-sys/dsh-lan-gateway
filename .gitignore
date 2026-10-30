@@ -30,3 +30,7 @@ desktop.ini
 !.env.example
 *.key
 *.pem
+
+# 开发日志：只在本机保留，绝不进提交、绝不推送
+# git 无法在 push 时按文件过滤，所以只能靠不追踪来保证不上云
+/DEVLOG.md
