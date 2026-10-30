@@ -130,6 +130,11 @@ check('runtime config sees the committed value', () => {
   assert(same(resolveConfig(live).listeners, [{ host: '192.0.2.10', port: 3090 }]), 'reconcile would use a stale list')
 })
 
+check('bindStates is a volatile echo the settings page can read', () => {
+  const live = activate({ listeners: [{ host: '127.0.0.1', port: 3081 }] })
+  assert(isVolatile(live.bindStates), 'bindStates must be volatile so the page updates live')
+  assert(Array.isArray(plainConfig(live).bindStates), 'bindStates must serialize as an array')
+})
 check('listeners and rebind action are declared volatile paths for mutate()', () => {
   assert(isVolatilePath(Config, ['listeners']) === true, 'listeners must be editable live')
   assert(isVolatilePath(Config, ['rebindNonce']) === true, 'rebindNonce must be writable as a live action')
